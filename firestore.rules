@@ -1,0 +1,110 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // Helper function to check if user is authenticated
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+    
+    // Helper function to check if user owns the document
+    function isOwner(userId) {
+      return isAuthenticated() && request.auth.uid == userId;
+    }
+    
+    // Helper function to validate lesson data
+    function isValidLesson() {
+      let data = request.resource.data;
+      return data.userId is string
+        && data.title is string
+        && data.description is string
+        && data.category is string
+        && data.difficulty in ['beginner', 'intermediate', 'advanced']
+        && data.duration is int
+        && data.completed is bool
+        && data.createdAt is timestamp
+        && data.updatedAt is timestamp;
+    }
+    
+    // Helper function to validate study session data
+    function isValidSession() {
+      let data = request.resource.data;
+      return data.userId is string
+        && data.lessonId is string
+        && data.lessonTitle is string
+        && data.startTime is timestamp
+        && data.duration is int
+        && data.createdAt is timestamp;
+    }
+    
+    // Helper function to validate goal data
+    function isValidGoal() {
+      let data = request.resource.data;
+      return data.userId is string
+        && data.title is string
+        && data.description is string
+        && data.targetDate is timestamp
+        && data.completed is bool
+        && data.progress is int
+        && data.progress >= 0
+        && data.progress <= 100
+        && data.createdAt is timestamp
+        && data.updatedAt is timestamp;
+    }
+    
+    // Lessons collection
+    match /lessons/{lessonId} {
+      // Users can read their own lessons
+      allow read: if isOwner(resource.data.userId);
+      
+      // Users can create lessons for themselves
+      allow create: if isOwner(request.resource.data.userId) && isValidLesson();
+      
+      // Users can update their own lessons
+      allow update: if isOwner(resource.data.userId) 
+                    && isOwner(request.resource.data.userId)
+                    && isValidLesson();
+      
+      // Users can delete their own lessons
+      allow delete: if isOwner(resource.data.userId);
+    }
+    
+    // Study sessions collection
+    match /studySessions/{sessionId} {
+      // Users can read their own sessions
+      allow read: if isOwner(resource.data.userId);
+      
+      // Users can create sessions for themselves
+      allow create: if isOwner(request.resource.data.userId) && isValidSession();
+      
+      // Users can update their own sessions
+      allow update: if isOwner(resource.data.userId) 
+                    && isOwner(request.resource.data.userId)
+                    && isValidSession();
+      
+      // Users can delete their own sessions
+      allow delete: if isOwner(resource.data.userId);
+    }
+    
+    // Goals collection
+    match /goals/{goalId} {
+      // Users can read their own goals
+      allow read: if isOwner(resource.data.userId);
+      
+      // Users can create goals for themselves
+      allow create: if isOwner(request.resource.data.userId) && isValidGoal();
+      
+      // Users can update their own goals
+      allow update: if isOwner(resource.data.userId) 
+                    && isOwner(request.resource.data.userId)
+                    && isValidGoal();
+      
+      // Users can delete their own goals
+      allow delete: if isOwner(resource.data.userId);
+    }
+    
+    // Deny all other requests
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}
