@@ -1,4 +1,4 @@
-import React, { useState, useEffect, lazy, Suspense } from 'react';
+import React, { useState, useEffect, lazy, Suspense, useCallback } from 'react';
 import { useAuth } from './AuthContext';
 import { useSync } from './SyncContext';
 import AuthUI from './AuthUI';
@@ -31,10 +31,21 @@ import {
   Filter,
   Download,
   CheckCircle,
-  AlertCircle
+  AlertCircle,
+  Cloud,
+  CloudOff
 } from 'lucide-react';
 import { logoutUser } from './authService';
 import { formatDateDisplay, parseFirestoreDate } from './utils/dateUtils';
+import { 
+  addEntry, 
+  deleteEntry, 
+  subscribeToEntries,
+  subscribeToGoals,
+  addTimerSession,
+  subscribeToTimerSessions,
+  migrateLocalStorageToFirestore
+} from './firestoreService';
 
 /**
  * CyberTrackerApp With Authentication
@@ -51,6 +62,8 @@ const CyberTrackerAppWithAuth = () => {
   const [darkMode, setDarkMode] = useState(false);
   const [activeTab, setActiveTab] = useState('tracker');
   const [profileSection, setProfileSection] = useState('profile');
+  const [isSyncing, setIsSyncing] = useState(false);
+  const [lastSyncTime, setLastSyncTime] = useState(null);
   
   // Data State
   const [entries, setEntries] = useState([]);
@@ -70,28 +83,92 @@ const CyberTrackerAppWithAuth = () => {
     notes: ''
   });
 
-  // Load data and preferences
+  // Load dark mode preference from localStorage
   useEffect(() => {
     const savedDarkMode = localStorage.getItem('darkMode');
     if (savedDarkMode) {
       setDarkMode(JSON.parse(savedDarkMode));
     }
-    
-    const savedEntries = localStorage.getItem('entries');
-    if (savedEntries) {
-      setEntries(JSON.parse(savedEntries));
-    }
-    
-    const savedGoals = localStorage.getItem('studyGoals');
-    if (savedGoals) {
-      setGoals(JSON.parse(savedGoals));
-    }
-    
-    const savedSessions = localStorage.getItem('timerSessions');
-    if (savedSessions) {
-      setTimerSessions(JSON.parse(savedSessions));
-    }
   }, []);
+
+  // Subscribe to Firestore data when user is authenticated
+  useEffect(() => {
+    if (!user?.uid) {
+      // User not logged in - load from localStorage as fallback
+      const savedEntries = localStorage.getItem('entries');
+      if (savedEntries) {
+        setEntries(JSON.parse(savedEntries));
+      }
+      
+      const savedGoals = localStorage.getItem('studyGoals');
+      if (savedGoals) {
+        setGoals(JSON.parse(savedGoals));
+      }
+      
+      const savedSessions = localStorage.getItem('timerSessions');
+      if (savedSessions) {
+        setTimerSessions(JSON.parse(savedSessions));
+      }
+      return;
+    }
+
+    // User is logged in - subscribe to Firestore real-time updates
+    setIsSyncing(true);
+    
+    // Check if we need to migrate localStorage data to Firestore
+    const checkAndMigrateData = async () => {
+      const localEntries = localStorage.getItem('entries');
+      const hasMigrated = localStorage.getItem(`migrated_${user.uid}`);
+      
+      if (localEntries && !hasMigrated) {
+        try {
+          const localData = {
+            entries: JSON.parse(localStorage.getItem('entries') || '[]'),
+            goals: JSON.parse(localStorage.getItem('studyGoals') || '[]'),
+            timerSessions: JSON.parse(localStorage.getItem('timerSessions') || '[]'),
+          };
+          
+          if (localData.entries.length > 0 || localData.goals.length > 0 || localData.timerSessions.length > 0) {
+            await migrateLocalStorageToFirestore(user.uid, localData);
+            localStorage.setItem(`migrated_${user.uid}`, 'true');
+            showNotification('📦 Your local data has been synced to the cloud!', 'success');
+          }
+        } catch (error) {
+          console.error('Migration error:', error);
+        }
+      }
+    };
+    
+    checkAndMigrateData();
+
+    // Subscribe to entries
+    const unsubscribeEntries = subscribeToEntries(user.uid, (firestoreEntries) => {
+      setEntries(firestoreEntries);
+      // Also update localStorage as backup
+      localStorage.setItem('entries', JSON.stringify(firestoreEntries));
+      setIsSyncing(false);
+      setLastSyncTime(new Date());
+    });
+
+    // Subscribe to goals
+    const unsubscribeGoals = subscribeToGoals(user.uid, (firestoreGoals) => {
+      setGoals(firestoreGoals);
+      localStorage.setItem('studyGoals', JSON.stringify(firestoreGoals));
+    });
+
+    // Subscribe to timer sessions
+    const unsubscribeTimerSessions = subscribeToTimerSessions(user.uid, (firestoreSessions) => {
+      setTimerSessions(firestoreSessions);
+      localStorage.setItem('timerSessions', JSON.stringify(firestoreSessions));
+    });
+
+    // Cleanup subscriptions on unmount or user change
+    return () => {
+      unsubscribeEntries();
+      unsubscribeGoals();
+      unsubscribeTimerSessions();
+    };
+  }, [user?.uid]);
 
   // Save dark mode preference
   useEffect(() => {
@@ -110,56 +187,97 @@ const CyberTrackerAppWithAuth = () => {
     setFormData(prev => ({ ...prev, [name]: value }));
   };
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
     if (!formData.week || !formData.topic || !formData.goal) {
       showNotification('Please fill in all required fields', 'error');
       return;
     }
 
-    const newEntry = {
-      id: Date.now(),
-      ...formData,
-      createdAt: new Date().toISOString()
-    };
-
-    const updatedEntries = [...entries, newEntry];
-    setEntries(updatedEntries);
-    localStorage.setItem('entries', JSON.stringify(updatedEntries));
-    
-    setFormData({
-      week: '',
-      topic: '',
-      goal: '',
-      status: '❌ Not Started',
-      notes: ''
-    });
-    
-    showNotification('Entry added successfully!', 'success');
-  };
-
-  const handleDelete = (id) => {
-    if (window.confirm('Are you sure you want to delete this entry?')) {
-      const updatedEntries = entries.filter(entry => entry.id !== id);
-      setEntries(updatedEntries);
-      localStorage.setItem('entries', JSON.stringify(updatedEntries));
-      showNotification('Entry deleted', 'success');
+    try {
+      if (user?.uid) {
+        // Save to Firestore (will be synced to local via subscription)
+        await addEntry(user.uid, {
+          week: formData.week,
+          topic: formData.topic,
+          goal: formData.goal,
+          status: formData.status,
+          notes: formData.notes,
+        });
+        showNotification('✅ Entry saved to cloud!', 'success');
+      } else {
+        // Fallback to localStorage only if not logged in
+        const newEntry = {
+          id: Date.now(),
+          ...formData,
+          createdAt: new Date().toISOString()
+        };
+        const updatedEntries = [...entries, newEntry];
+        setEntries(updatedEntries);
+        localStorage.setItem('entries', JSON.stringify(updatedEntries));
+        showNotification('Entry added (local only - log in to sync)', 'success');
+      }
+      
+      setFormData({
+        week: '',
+        topic: '',
+        goal: '',
+        status: '❌ Not Started',
+        notes: ''
+      });
+    } catch (error) {
+      console.error('Error saving entry:', error);
+      showNotification('Failed to save entry. Please try again.', 'error');
     }
   };
 
-  const handleSessionComplete = (sessionData) => {
-    const newSession = {
-      id: Date.now(),
-      type: sessionData.type,
-      duration: sessionData.duration,
-      completedAt: new Date().toISOString()
-    };
-    
-    const updatedSessions = [...timerSessions, newSession];
-    setTimerSessions(updatedSessions);
-    localStorage.setItem('timerSessions', JSON.stringify(updatedSessions));
-    
-    showNotification(`${sessionData.type === 'work' ? '✅ Work session' : '☕ Break'} completed!`, 'success');
+  const handleDelete = async (id) => {
+    if (window.confirm('Are you sure you want to delete this entry?')) {
+      try {
+        if (user?.uid) {
+          // Delete from Firestore
+          await deleteEntry(user.uid, id.toString());
+          showNotification('🗑️ Entry deleted from cloud', 'success');
+        } else {
+          // Fallback to localStorage
+          const updatedEntries = entries.filter(entry => entry.id !== id);
+          setEntries(updatedEntries);
+          localStorage.setItem('entries', JSON.stringify(updatedEntries));
+          showNotification('Entry deleted', 'success');
+        }
+      } catch (error) {
+        console.error('Error deleting entry:', error);
+        showNotification('Failed to delete entry. Please try again.', 'error');
+      }
+    }
+  };
+
+  const handleSessionComplete = async (sessionData) => {
+    try {
+      if (user?.uid) {
+        // Save to Firestore
+        await addTimerSession(user.uid, {
+          type: sessionData.type,
+          duration: sessionData.duration,
+          completedAt: new Date().toISOString()
+        });
+      } else {
+        // Fallback to localStorage
+        const newSession = {
+          id: Date.now(),
+          type: sessionData.type,
+          duration: sessionData.duration,
+          completedAt: new Date().toISOString()
+        };
+        const updatedSessions = [...timerSessions, newSession];
+        setTimerSessions(updatedSessions);
+        localStorage.setItem('timerSessions', JSON.stringify(updatedSessions));
+      }
+      
+      showNotification(`${sessionData.type === 'work' ? '✅ Work session' : '☕ Break'} completed!`, 'success');
+    } catch (error) {
+      console.error('Error saving session:', error);
+    }
   };
 
   // Logout handler
@@ -271,15 +389,51 @@ const CyberTrackerAppWithAuth = () => {
             <p className={`text-lg ${darkMode ? 'text-gray-300' : 'text-gray-700'}`}>
               Track your cybersecurity learning journey
             </p>
-            <button
-              onClick={() => setDarkMode(!darkMode)}
-              className={`absolute top-3 right-3 p-2 rounded-lg transition-all duration-200 ${
-                darkMode ? 'bg-gray-800/50 hover:bg-gray-700/60 border border-purple-600/30' : 'bg-white/60 hover:bg-white/80 border border-purple-300/40'
-              } shadow-md hover:shadow-lg`}
-              title="Toggle dark mode"
-            >
-              {darkMode ? <Sun size={18} /> : <Moon size={18} />}
-            </button>
+            
+            {/* Top right controls */}
+            <div className="absolute top-3 right-3 flex items-center gap-2">
+              {/* Cloud Sync Status */}
+              {user && (
+                <div 
+                  className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-medium transition-all duration-200 ${
+                    isSyncing 
+                      ? (darkMode ? 'bg-blue-900/50 text-blue-300 border border-blue-600/30' : 'bg-blue-100 text-blue-700 border border-blue-300')
+                      : isOnline 
+                        ? (darkMode ? 'bg-green-900/50 text-green-300 border border-green-600/30' : 'bg-green-100 text-green-700 border border-green-300')
+                        : (darkMode ? 'bg-orange-900/50 text-orange-300 border border-orange-600/30' : 'bg-orange-100 text-orange-700 border border-orange-300')
+                  }`}
+                  title={isSyncing ? 'Syncing...' : isOnline ? `Synced to cloud${lastSyncTime ? ` at ${lastSyncTime.toLocaleTimeString()}` : ''}` : 'Offline - changes will sync when online'}
+                >
+                  {isSyncing ? (
+                    <>
+                      <Cloud size={14} className="animate-pulse" />
+                      <span>Syncing</span>
+                    </>
+                  ) : isOnline ? (
+                    <>
+                      <Cloud size={14} />
+                      <span>Synced</span>
+                    </>
+                  ) : (
+                    <>
+                      <CloudOff size={14} />
+                      <span>Offline</span>
+                    </>
+                  )}
+                </div>
+              )}
+              
+              {/* Dark Mode Toggle */}
+              <button
+                onClick={() => setDarkMode(!darkMode)}
+                className={`p-2 rounded-lg transition-all duration-200 ${
+                  darkMode ? 'bg-gray-800/50 hover:bg-gray-700/60 border border-purple-600/30' : 'bg-white/60 hover:bg-white/80 border border-purple-300/40'
+                } shadow-md hover:shadow-lg`}
+                title="Toggle dark mode"
+              >
+                {darkMode ? <Sun size={18} /> : <Moon size={18} />}
+              </button>
+            </div>
           </div>
         </div>
 
