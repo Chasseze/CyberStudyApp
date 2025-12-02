@@ -1,0 +1,28 @@
+{
+  "name": "cyberstudy-tracker",
+  "version": 2,
+  "builds": [
+    {
+      "src": "package.json",
+      "use": "@vercel/static-build",
+      "config": {
+        "distDir": "dist"
+      }
+    }
+  ],
+  "routes": [
+    {
+      "src": "/(.*)",
+      "dest": "/index.html"
+    }
+  ],
+  "env": {
+    "VITE_DEMO_MODE": "false",
+    "VITE_FIREBASE_API_KEY": "AIzaSyCh4SuPzcDSAXfwZJj0iJB6891EapGVKD4",
+    "VITE_FIREBASE_AUTH_DOMAIN": "cyberstudy-tracker.firebaseapp.com",
+    "VITE_FIREBASE_PROJECT_ID": "cyberstudy-tracker",
+    "VITE_FIREBASE_STORAGE_BUCKET": "cyberstudy-tracker.firebasestorage.app",
+    "VITE_FIREBASE_MESSAGING_SENDER_ID": "489012398925",
+    "VITE_FIREBASE_APP_ID": "1:489012398925:web:2a4f59c1682e70a5c2c504"
+  }
+}
