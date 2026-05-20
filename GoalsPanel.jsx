@@ -1,6 +1,7 @@
 import React, { useState, useMemo } from 'react';
 import { Plus, Trash2, Edit2, Trophy, Target, Zap, TrendingUp, Award, AlertCircle } from 'lucide-react';
 import { parseFirestoreDate, getDateKey } from './utils/dateUtils';
+import { normalizeStatus, ENTRY_STATUS } from './src/constants/status.js';
 
 /**
  * Goals Panel Component
@@ -147,7 +148,7 @@ const GoalsPanel = ({ entries, darkMode, onGoalsUpdate }) => {
     const thisWeekEntries = entriesWithDates.filter(entry => {
       return entry.parsedDate >= weekStart;
     });
-    const completedThisWeek = thisWeekEntries.filter(e => e.status === '✅ Completed').length;
+    const completedThisWeek = thisWeekEntries.filter((e) => normalizeStatus(e.status) === ENTRY_STATUS.COMPLETED).length;
     
     if (completedThisWeek >= 5) {
       badges.push({
@@ -173,7 +174,7 @@ const GoalsPanel = ({ entries, darkMode, onGoalsUpdate }) => {
     }
 
     // Expert level
-  const completedTopics = [...new Set(entriesWithDates.filter(e => e.status === '✅ Completed').map(e => e.topic))].length;
+  const completedTopics = [...new Set(entriesWithDates.filter((e) => normalizeStatus(e.status) === ENTRY_STATUS.COMPLETED).map((e) => e.topic))].length;
     if (completedTopics >= 5) {
       badges.push({
         id: 'expert',

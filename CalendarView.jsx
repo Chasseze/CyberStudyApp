@@ -2,6 +2,15 @@ import React, { useMemo, useState } from 'react';
 import { ChevronLeft, ChevronRight, Flame, Award, Target, Calendar as CalendarIcon } from 'lucide-react';
 import { format, startOfMonth, endOfMonth, eachDayOfInterval, isSameDay, addMonths, subMonths } from 'date-fns';
 import { getDateKey } from './utils/dateUtils';
+import { normalizeStatus, ENTRY_STATUS } from './src/constants/status.js';
+
+function getStatusBorderClass(status) {
+  const s = normalizeStatus(status);
+  if (s === ENTRY_STATUS.COMPLETED) return 'border-green-500';
+  if (s === ENTRY_STATUS.IN_PROGRESS) return 'border-amber-500';
+  if (s === ENTRY_STATUS.REVIEW_NEEDED) return 'border-purple-500';
+  return 'border-red-500';
+}
 
 /**
  * Calendar View Component
@@ -293,15 +302,7 @@ const CalendarView = ({ entries = [], darkMode }) => {
             entriesByDate[format(new Date(), 'yyyy-MM-dd')].map((entry, idx) => (
               <div
                 key={idx}
-                className={`p-4 rounded-lg ${darkMode ? 'bg-gray-700/50' : 'bg-gray-50'} border-l-4 ${
-                  entry.status === '✅ Completed'
-                    ? 'border-green-500'
-                    : entry.status === '🟡 In Progress'
-                    ? 'border-yellow-500'
-                    : entry.status === '🔄 Review Needed'
-                    ? 'border-purple-500'
-                    : 'border-red-500'
-                }`}
+                className={`p-4 rounded-lg ${darkMode ? 'bg-gray-700/50' : 'bg-gray-50'} border-l-4 ${getStatusBorderClass(entry.status)}`}
               >
                 <div className="flex items-start justify-between">
                   <div className="flex-1">

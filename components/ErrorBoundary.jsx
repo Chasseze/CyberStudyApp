@@ -58,9 +58,9 @@ class ErrorBoundary extends React.Component {
             <RefreshCw size={16} />
             Try Again
           </button>
-          {this.state.error && (
+          {import.meta.env.DEV && this.state.error && (
             <details className={`mt-4 text-left text-xs ${darkMode ? 'text-gray-500' : 'text-gray-500'}`}>
-              <summary className="cursor-pointer">Error details</summary>
+              <summary className="cursor-pointer">Error details (dev only)</summary>
               <pre className={`mt-2 p-2 rounded overflow-auto max-h-40 ${darkMode ? 'bg-gray-900' : 'bg-gray-100'}`}>
                 {this.state.error.toString()}
                 {this.state.errorInfo?.componentStack}

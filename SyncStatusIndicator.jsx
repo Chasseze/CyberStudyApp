@@ -1,120 +1,26 @@
-import React, { useState, useEffect } from 'react';
-import { Cloud, CloudOff, Loader, CheckCircle, AlertCircle, Wifi, WifiOff } from 'lucide-react';
-import { getFirestore, enableNetwork, disableNetwork } from 'firebase/firestore';
+import React from 'react';
+import { CloudOff, Loader, CheckCircle, AlertCircle } from 'lucide-react';
+import { useSync } from './SyncContext';
 
-/**
- * SyncStatusIndicator Component
- * Shows real-time sync status and connection state
- */
 const SyncStatusIndicator = ({ darkMode, show = true }) => {
-  const [isOnline, setIsOnline] = useState(navigator.onLine);
-  const [syncStatus, setSyncStatus] = useState('synced'); // 'syncing', 'synced', 'error', 'offline'
-  const [lastSyncTime, setLastSyncTime] = useState(null);
-  const [tooltip, setTooltip] = useState('');
-
-  // Listen for online/offline events
-  useEffect(() => {
-    const handleOnline = () => {
-      setIsOnline(true);
-      setSyncStatus('synced');
-      setTooltip('Back online - syncing data');
-    };
-
-    const handleOffline = () => {
-      setIsOnline(false);
-      setSyncStatus('offline');
-      setTooltip('Offline - data will sync when online');
-    };
-
-    window.addEventListener('online', handleOnline);
-    window.addEventListener('offline', handleOffline);
-
-    return () => {
-      window.removeEventListener('online', handleOnline);
-      window.removeEventListener('offline', handleOffline);
-    };
-  }, []);
-
-  // Simulate sync status changes
-  useEffect(() => {
-    if (!isOnline) return;
-
-    // Random sync events to show sync status
-    const interval = setInterval(() => {
-      if (Math.random() > 0.8) {
-        setSyncStatus('syncing');
-        setTooltip('Syncing data...');
-        
-        // Simulate sync completion
-        setTimeout(() => {
-          setSyncStatus('synced');
-          setLastSyncTime(new Date());
-          setTooltip(`Last synced: ${new Date().toLocaleTimeString()}`);
-        }, 500 + Math.random() * 1500);
-      }
-    }, 5000);
-
-    return () => clearInterval(interval);
-  }, [isOnline]);
-
+  const { isOnline, syncStatus, lastSyncTime, syncError, hasPendingOperations, pendingCount } = useSync();
   if (!show) return null;
 
-  // Status styles
-  const statusConfig = {
-    synced: {
-      icon: CheckCircle,
-      color: 'text-green-500',
-      bgColor: darkMode ? 'bg-green-900/20' : 'bg-green-50',
-      borderColor: darkMode ? 'border-green-700' : 'border-green-200',
-      label: 'Synced',
-    },
-    syncing: {
-      icon: Loader,
-      color: 'text-blue-500',
-      bgColor: darkMode ? 'bg-blue-900/20' : 'bg-blue-50',
-      borderColor: darkMode ? 'border-blue-700' : 'border-blue-200',
-      label: 'Syncing...',
-      animate: true,
-    },
-    error: {
-      icon: AlertCircle,
-      color: 'text-red-500',
-      bgColor: darkMode ? 'bg-red-900/20' : 'bg-red-50',
-      borderColor: darkMode ? 'border-red-700' : 'border-red-200',
-      label: 'Sync Error',
-    },
-    offline: {
-      icon: CloudOff,
-      color: 'text-gray-500',
-      bgColor: darkMode ? 'bg-gray-800' : 'bg-gray-100',
-      borderColor: darkMode ? 'border-gray-600' : 'border-gray-300',
-      label: 'Offline',
-    },
-  };
+  const config =
+    !isOnline || syncStatus === 'offline'
+      ? { Icon: CloudOff, bg: darkMode ? 'bg-gray-800' : 'bg-gray-100', color: darkMode ? 'text-gray-400' : 'text-gray-500', label: 'Offline', tip: 'Offline — changes sync when you reconnect' }
+      : syncStatus === 'syncing' || hasPendingOperations
+        ? { Icon: Loader, bg: darkMode ? 'bg-blue-900/30' : 'bg-blue-50', color: darkMode ? 'text-blue-400' : 'text-blue-600', label: 'Syncing', tip: pendingCount ? `Syncing ${pendingCount} change(s)…` : 'Syncing…', spin: true }
+        : syncStatus === 'error'
+          ? { Icon: AlertCircle, bg: darkMode ? 'bg-red-900/30' : 'bg-red-50', color: darkMode ? 'text-red-400' : 'text-red-600', label: 'Error', tip: syncError || 'Sync failed' }
+          : { Icon: CheckCircle, bg: darkMode ? 'bg-green-900/30' : 'bg-green-50', color: darkMode ? 'text-green-400' : 'text-green-600', label: 'Synced', tip: lastSyncTime ? `Last synced ${lastSyncTime.toLocaleTimeString()}` : 'All changes saved' };
 
-  const config = statusConfig[syncStatus];
-  const Icon = config.icon;
+  const { Icon, bg, color, label, tip, spin } = config;
 
   return (
-    <div
-      className={`fixed bottom-4 right-4 px-4 py-2 rounded-lg border ${config.bgColor} ${config.borderColor} flex items-center gap-2 z-40 group cursor-help transition-all`}
-      title={tooltip}
-      onMouseEnter={() => setTooltip(tooltip)}
-    >
-      <Icon
-        size={16}
-        className={`${config.color} ${config.animate ? 'animate-spin' : ''}`}
-      />
-      <span className={`text-xs font-medium ${darkMode ? 'text-gray-300' : 'text-gray-700'}`}>
-        {config.label}
-      </span>
-
-      {/* Tooltip on hover */}
-      <div className={`absolute bottom-full mb-2 right-0 px-3 py-2 rounded-lg text-xs whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none ${
-        darkMode ? 'bg-gray-900 text-gray-200 border border-gray-700' : 'bg-gray-900 text-white border border-gray-800'
-      }`}>
-        {tooltip || config.label}
-      </div>
+    <div className={`inline-flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-medium ${bg} ${color}`} title={tip} role="status" aria-live="polite">
+      <Icon size={14} className={spin ? 'animate-spin' : ''} aria-hidden />
+      <span className="hidden sm:inline">{label}</span>
     </div>
   );
 };

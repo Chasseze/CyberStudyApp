@@ -379,6 +379,16 @@ const AccountManagementPanel = ({ darkMode, onLogout }) => {
         </div>
       </div>
 
+      <div className={`${darkMode ? 'bg-gray-800 border-gray-700' : 'bg-white border-gray-100'} rounded-2xl p-8 border space-y-4`}>
+        <h2 className={`text-2xl font-bold flex items-center gap-2 ${darkMode ? 'text-white' : 'text-gray-900'}`}>
+          <Shield size={24} /> Privacy & data
+        </h2>
+        <p className={`text-sm ${darkMode ? 'text-gray-400' : 'text-gray-600'}`}>
+          Your study data is stored in Firebase under your account. Export anytime from the Data tab.
+        </p>
+        <a href="/privacy.html" target="_blank" rel="noopener noreferrer" className="text-sm font-semibold text-indigo-600 underline">Privacy policy</a>
+      </div>
+
       {/* Delete Account Section */}
       <div className={`${darkMode ? 'bg-red-900/20 border-red-700' : 'bg-red-50 border-red-200'} rounded-2xl p-8 border space-y-6`}>
         <h2 className={`text-2xl font-bold flex items-center gap-2 ${darkMode ? 'text-red-300' : 'text-red-700'}`}>

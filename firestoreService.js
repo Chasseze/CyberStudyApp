@@ -14,6 +14,7 @@ import {
   writeBatch,
 } from 'firebase/firestore';
 import { db } from './firebaseConfig';
+import { normalizeStatus } from './src/constants/status.js';
 
 /**
  * Firestore Service Layer
@@ -32,6 +33,7 @@ export const addEntry = async (userId, entryData) => {
       id: entryId,
       userId,
       ...entryData,
+      status: normalizeStatus(entryData.status),
       createdAt: serverTimestamp(),
       updatedAt: serverTimestamp(),
     };
@@ -72,9 +74,10 @@ export const subscribeToEntries = (userId, callback) => {
     const q = query(entriesRef, orderBy('createdAt', 'desc'));
     
     return onSnapshot(q, (snapshot) => {
-      const entries = snapshot.docs.map(doc => ({
-        ...doc.data(),
-        id: doc.id,
+      const entries = snapshot.docs.map((d) => ({
+        ...d.data(),
+        id: d.id,
+        status: normalizeStatus(d.data().status),
       }));
       callback(entries);
     });
@@ -90,10 +93,9 @@ export const subscribeToEntries = (userId, callback) => {
 export const updateEntry = async (userId, entryId, updates) => {
   try {
     const entryRef = doc(db, 'entries', userId, 'data', entryId);
-    await updateDoc(entryRef, {
-      ...updates,
-      updatedAt: serverTimestamp(),
-    });
+    const payload = { ...updates, updatedAt: serverTimestamp() };
+    if (updates.status !== undefined) payload.status = normalizeStatus(updates.status);
+    await updateDoc(entryRef, payload);
   } catch (error) {
     console.error('Error updating entry:', error);
     throw error;
@@ -324,10 +326,8 @@ export const subscribeToStreak = (userId, callback) => {
   try {
     const streakRef = doc(db, 'streaks', userId, 'data', 'current');
     
-    return onSnapshot(streakRef, (doc) => {
-      if (doc.exists()) {
-        callback(doc.data());
-      }
+    return onSnapshot(streakRef, (snap) => {
+      callback(snap.exists() ? snap.data() : { currentStreak: 0, maxStreak: 0 });
     });
   } catch (error) {
     console.error('Error subscribing to streak:', error);

@@ -23,7 +23,7 @@ import { getUserProfile, updateUserProfile } from './authService';
  * UserSettingsPanel Component
  * Handles user preferences and settings management
  */
-const UserSettingsPanel = ({ darkMode, onDarkModeChange, onThemeChange }) => {
+const UserSettingsPanel = ({ darkMode, onDarkModeChange, onThemeChange, soundEnabled = true, onSoundEnabledChange }) => {
   const { user } = useAuth();
   const [settings, setSettings] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -233,6 +233,14 @@ const UserSettingsPanel = ({ darkMode, onDarkModeChange, onThemeChange }) => {
             >
               {formData.notifications.enabled ? 'On' : 'Off'}
             </button>
+          </div>
+
+          <div className="flex items-center justify-between pb-4 border-b" style={{ borderColor: darkMode ? '#374151' : '#e5e7eb' }}>
+            <div>
+              <p className="font-semibold flex items-center gap-2">{soundEnabled ? <Volume2 size={18} /> : <VolumeX size={18} />} Pomodoro sounds</p>
+              <p className={`text-sm ${darkMode ? 'text-gray-400' : 'text-gray-600'}`}>Chime when sessions end</p>
+            </div>
+            <button type="button" onClick={() => onSoundEnabledChange?.(!soundEnabled)} className={`px-4 py-2 rounded-lg font-semibold ${soundEnabled ? 'bg-green-600 text-white' : 'bg-gray-200'}`}>{soundEnabled ? 'On' : 'Off'}</button>
           </div>
 
           {/* Sound Notifications */}

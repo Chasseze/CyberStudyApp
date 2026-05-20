@@ -1,28 +1,34 @@
 import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
+import { VitePWA } from 'vite-plugin-pwa'
 
-// https://vitejs.dev/config/
 export default defineConfig({
-  plugins: [react()],
-  server: {
-    port: 5174,
-  },
+  plugins: [
+    react(),
+    VitePWA({
+      registerType: 'autoUpdate',
+      includeAssets: ['chassze-logo.svg', 'privacy.html'],
+      manifest: {
+        name: 'CyberStudy Tracker',
+        short_name: 'CyberStudy',
+        description: 'Track your cybersecurity learning journey',
+        theme_color: '#4f46e5',
+        background_color: '#0f172a',
+        display: 'standalone',
+        icons: [{ src: '/chassze-logo.svg', sizes: 'any', type: 'image/svg+xml', purpose: 'any' }],
+      },
+    }),
+  ],
+  server: { port: 5174 },
   build: {
-    // Increase chunk size warning limit slightly
     chunkSizeWarningLimit: 600,
     rollupOptions: {
       output: {
-        // Manual chunk splitting for better caching
         manualChunks: {
-          // React and core libraries
           'vendor-react': ['react', 'react-dom'],
-          // Charting libraries (heavy)
           'vendor-charts': ['recharts', 'chart.js', 'react-chartjs-2'],
-          // Date utilities
           'vendor-date': ['date-fns'],
-          // Firebase (heavy)
           'vendor-firebase': ['firebase/app', 'firebase/auth', 'firebase/firestore'],
-          // Icons
           'vendor-icons': ['lucide-react'],
         },
       },

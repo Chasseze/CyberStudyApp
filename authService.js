@@ -4,6 +4,8 @@ import {
   signOut,
   onAuthStateChanged,
   updateProfile,
+  sendPasswordResetEmail,
+  sendEmailVerification,
 } from 'firebase/auth';
 import { auth, db } from './firebaseConfig';
 import { doc, setDoc, getDoc, serverTimestamp } from 'firebase/firestore';
@@ -49,7 +51,12 @@ export const registerUser = async (email, password, displayName) => {
       },
     });
 
-    // Initialize streak document
+    try {
+      await sendEmailVerification(user);
+    } catch (e) {
+      console.warn('Verification email:', e);
+    }
+
     await setDoc(doc(db, 'streaks', user.uid, 'data', 'current'), {
       userId: user.uid,
       currentStreak: 0,
@@ -170,6 +177,16 @@ export const updateUserPreferences = async (uid, preferences) => {
     console.error('Error updating preferences:', error);
     throw error;
   }
+};
+
+export const resetPassword = async (email) => {
+  await sendPasswordResetEmail(auth, email);
+};
+
+export const resendVerificationEmail = async () => {
+  const user = auth.currentUser;
+  if (!user) throw new Error('No user signed in');
+  await sendEmailVerification(user);
 };
 
 /**

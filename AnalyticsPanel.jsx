@@ -1,6 +1,7 @@
 import React, { useMemo } from 'react';
 import { LineChart, Line, BarChart, Bar, PieChart, Pie, Cell, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
 import { TrendingUp, Calendar, Clock, CheckCircle, AlertCircle } from 'lucide-react';
+import { countByStatus, normalizeStatus, ENTRY_STATUS } from './src/constants/status.js';
 
 /**
  * Analytics Panel Component
@@ -26,10 +27,11 @@ const AnalyticsPanel = ({ entries, darkMode, timerSessions }) => {
 
     // Basic counts
     const totalEntries = entries.length;
-    const completedCount = entries.filter(e => e.status === '✅ Completed').length;
-    const inProgressCount = entries.filter(e => e.status === '🟡 In Progress').length;
-    const notStartedCount = entries.filter(e => e.status === '❌ Not Started').length;
-    const reviewNeededCount = entries.filter(e => e.status === '🔄 Review Needed').length;
+    const counts = countByStatus(entries);
+    const completedCount = counts.completed;
+    const inProgressCount = counts.inProgress;
+    const notStartedCount = counts.notStarted;
+    const reviewNeededCount = counts.review;
 
     // Completion rate
     const completionRate = totalEntries > 0 ? Math.round((completedCount / totalEntries) * 100) : 0;
@@ -41,7 +43,7 @@ const AnalyticsPanel = ({ entries, darkMode, timerSessions }) => {
         topicStats[entry.topic] = { completed: 0, total: 0 };
       }
       topicStats[entry.topic].total += 1;
-      if (entry.status === '✅ Completed') {
+      if (normalizeStatus(entry.status) === ENTRY_STATUS.COMPLETED) {
         topicStats[entry.topic].completed += 1;
       }
     });
@@ -62,7 +64,7 @@ const AnalyticsPanel = ({ entries, darkMode, timerSessions }) => {
         weeklyData[week] = { week: `Week ${week}`, completed: 0, total: 0 };
       }
       weeklyData[week].total += 1;
-      if (entry.status === '✅ Completed') {
+      if (normalizeStatus(entry.status) === ENTRY_STATUS.COMPLETED) {
         weeklyData[week].completed += 1;
       }
     });
@@ -122,7 +124,7 @@ const AnalyticsPanel = ({ entries, darkMode, timerSessions }) => {
   const COLORS = ['#10b981', '#f59e0b', '#ef4444', '#8b5cf6'];
 
   return (
-    <div className={`space-y-6 max-w-6xl mx-auto`}>
+    <div className="space-y-6 max-w-4xl mx-auto w-full">
       {/* KPI Cards */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
         {/* Completion Rate */}

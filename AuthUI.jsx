@@ -1,261 +1,105 @@
 import React, { useState } from 'react';
-import { Mail, Lock, User, Loader, AlertCircle, Eye, EyeOff } from 'lucide-react';
-import { registerUser, loginUser } from './authService';
+import { Mail, Lock, User, Loader, AlertCircle, Eye, EyeOff, ArrowLeft } from 'lucide-react';
+import { registerUser, loginUser, resetPassword } from './authService';
 
-/**
- * AuthUI Component
- * Displays login and signup forms
- */
-const AuthUI = ({ darkMode, onAuthSuccess }) => {
-  const [mode, setMode] = useState('login'); // 'login' or 'signup'
+const AuthUI = ({ darkMode }) => {
+  const [mode, setMode] = useState('login');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [displayName, setDisplayName] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const [success, setSuccess] = useState('');
+
+  const inputCls = `w-full pl-10 pr-4 py-2 rounded-lg border focus-visible:ring-2 focus-visible:ring-indigo-500 ${
+    darkMode ? 'bg-gray-700 border-gray-600 text-white' : 'bg-white border-gray-300'
+  }`;
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError('');
+    setSuccess('');
     setLoading(true);
-
     try {
-      if (mode === 'signup') {
-        if (!displayName.trim()) {
-          setError('Please enter your name');
-          setLoading(false);
-          return;
-        }
-        const user = await registerUser(email, password, displayName);
-        console.log('User registered:', user);
-      } else {
-        const user = await loginUser(email, password);
-        console.log('User logged in:', user);
+      if (mode === 'reset') {
+        await resetPassword(email);
+        setSuccess('Password reset email sent. Check your inbox.');
+        return;
       }
-
-      // Reset form
+      if (mode === 'signup') {
+        if (!displayName.trim()) { setError('Please enter your name'); return; }
+        await registerUser(email, password, displayName);
+        setSuccess('Account created! Check your email to verify.');
+      } else {
+        await loginUser(email, password);
+      }
       setEmail('');
       setPassword('');
       setDisplayName('');
-
-      // Call success callback
-      if (onAuthSuccess) {
-        onAuthSuccess();
-      }
     } catch (err) {
-      console.error('Auth error:', err);
-      // Format Firebase error messages
-      if (err.code === 'auth/email-already-in-use') {
-        setError('This email is already registered');
-      } else if (err.code === 'auth/invalid-email') {
-        setError('Invalid email address');
-      } else if (err.code === 'auth/weak-password') {
-        setError('Password should be at least 6 characters');
-      } else if (err.code === 'auth/user-not-found') {
-        setError('No account found with this email');
-      } else if (err.code === 'auth/wrong-password') {
-        setError('Incorrect password');
-      } else {
-        setError(err.message || 'An error occurred');
-      }
+      const map = {
+        'auth/email-already-in-use': 'Email already registered',
+        'auth/invalid-credential': 'Invalid email or password',
+        'auth/wrong-password': 'Incorrect password',
+      };
+      setError(map[err.code] || err.message);
     } finally {
       setLoading(false);
     }
   };
 
   return (
-    <div className={`min-h-screen flex items-center justify-center px-4 ${
-      darkMode
-        ? 'bg-gradient-to-br from-gray-900 via-gray-800 to-gray-900'
-        : 'bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-100'
-    }`}>
-      <div className={`w-full max-w-md ${
-        darkMode
-          ? 'bg-gray-800 border-gray-700'
-          : 'bg-white border-gray-200'
-      } rounded-2xl shadow-2xl p-8 border`}>
-        {/* Header */}
-        <div className="mb-8">
-          <h1 className={`text-3xl font-bold text-center mb-2 ${
-            darkMode ? 'text-white' : 'text-gray-900'
-          }`}>
-            CyberStudy
-          </h1>
-          <p className={`text-center text-sm ${
-            darkMode ? 'text-gray-400' : 'text-gray-600'
-          }`}>
-            {mode === 'login' ? 'Welcome back' : 'Join our learning community'}
+    <div className={`min-h-screen flex items-center justify-center px-4 ${darkMode ? 'bg-gray-900' : 'bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-100'}`}>
+      <div className={`w-full max-w-md rounded-2xl shadow-2xl p-8 border ${darkMode ? 'bg-gray-800 border-gray-700' : 'bg-white border-gray-200'}`}>
+        <div className="flex flex-col items-center mb-8">
+          <img src="/chassze-logo.svg" alt="" className="h-14 w-14 mb-3" width={56} height={56} />
+          <h1 className={`text-3xl font-bold ${darkMode ? 'text-white' : 'text-gray-900'}`}>CyberStudy</h1>
+          <p className={`text-sm mt-1 ${darkMode ? 'text-gray-400' : 'text-gray-600'}`}>
+            {mode === 'login' ? 'Welcome back' : mode === 'signup' ? 'Create your account' : 'Reset password'}
           </p>
         </div>
-
-        {/* Error Message */}
-        {error && (
-          <div className={`mb-6 p-4 rounded-lg border flex gap-3 ${
-            darkMode
-              ? 'bg-red-900/20 border-red-700 text-red-300'
-              : 'bg-red-50 border-red-200 text-red-700'
-          }`}>
-            <AlertCircle size={20} className="flex-shrink-0" />
-            <span className="text-sm">{error}</span>
-          </div>
-        )}
-
-        {/* Form */}
-        <form onSubmit={handleSubmit} className="space-y-5">
-          {/* Display Name (Signup only) */}
+        {error && <div className="mb-4 p-3 rounded-lg bg-red-50 text-red-700 text-sm flex gap-2" role="alert"><AlertCircle size={18} />{error}</div>}
+        {success && <div className="mb-4 p-3 rounded-lg bg-green-50 text-green-800 text-sm" role="status">{success}</div>}
+        <form onSubmit={handleSubmit} className="space-y-4">
           {mode === 'signup' && (
             <div>
-              <label className={`block text-sm font-medium mb-2 ${
-                darkMode ? 'text-gray-300' : 'text-gray-700'
-              }`}>
-                Full Name
-              </label>
-              <div className="relative">
-                <User className={`absolute left-3 top-3 ${
-                  darkMode ? 'text-gray-500' : 'text-gray-400'
-                }`} size={18} />
-                <input
-                  type="text"
-                  value={displayName}
-                  onChange={(e) => setDisplayName(e.target.value)}
-                  placeholder="Your name"
-                  className={`w-full pl-10 pr-4 py-2 rounded-lg border ${
-                    darkMode
-                      ? 'bg-gray-700 border-gray-600 text-white placeholder-gray-500'
-                      : 'bg-white border-gray-300 text-gray-900 placeholder-gray-400'
-                  } focus:outline-none focus:ring-2 focus:ring-indigo-500`}
-                />
+              <label htmlFor="auth-name" className="text-sm font-medium">Full name</label>
+              <div className="relative mt-1"><User className="absolute left-3 top-3 text-gray-400" size={18} /><input id="auth-name" className={inputCls} value={displayName} onChange={(e) => setDisplayName(e.target.value)} /></div>
+            </div>
+          )}
+          <div>
+            <label htmlFor="auth-email" className="text-sm font-medium">Email</label>
+            <div className="relative mt-1"><Mail className="absolute left-3 top-3 text-gray-400" size={18} /><input id="auth-email" type="email" required className={inputCls} value={email} onChange={(e) => setEmail(e.target.value)} /></div>
+          </div>
+          {mode !== 'reset' && (
+            <div>
+              <label htmlFor="auth-password" className="text-sm font-medium">Password</label>
+              <div className="relative mt-1">
+                <Lock className="absolute left-3 top-3 text-gray-400" size={18} />
+                <input id="auth-password" type={showPassword ? 'text' : 'password'} required className={`${inputCls} pr-10`} value={password} onChange={(e) => setPassword(e.target.value)} />
+                <button type="button" className="absolute right-3 top-3" onClick={() => setShowPassword(!showPassword)} aria-label="Toggle password">{showPassword ? <EyeOff size={18} /> : <Eye size={18} />}</button>
               </div>
             </div>
           )}
-
-          {/* Email */}
-          <div>
-            <label className={`block text-sm font-medium mb-2 ${
-              darkMode ? 'text-gray-300' : 'text-gray-700'
-            }`}>
-              Email
-            </label>
-            <div className="relative">
-              <Mail className={`absolute left-3 top-3 ${
-                darkMode ? 'text-gray-500' : 'text-gray-400'
-              }`} size={18} />
-              <input
-                type="email"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                placeholder="your@email.com"
-                required
-                className={`w-full pl-10 pr-4 py-2 rounded-lg border ${
-                  darkMode
-                    ? 'bg-gray-700 border-gray-600 text-white placeholder-gray-500'
-                    : 'bg-white border-gray-300 text-gray-900 placeholder-gray-400'
-                } focus:outline-none focus:ring-2 focus:ring-indigo-500`}
-              />
-            </div>
-          </div>
-
-          {/* Password */}
-          <div>
-            <label className={`block text-sm font-medium mb-2 ${
-              darkMode ? 'text-gray-300' : 'text-gray-700'
-            }`}>
-              Password
-            </label>
-            <div className="relative">
-              <Lock className={`absolute left-3 top-3 ${
-                darkMode ? 'text-gray-500' : 'text-gray-400'
-              }`} size={18} />
-              <input
-                type={showPassword ? 'text' : 'password'}
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                placeholder="••••••••"
-                required
-                className={`w-full pl-10 pr-10 py-2 rounded-lg border ${
-                  darkMode
-                    ? 'bg-gray-700 border-gray-600 text-white placeholder-gray-500'
-                    : 'bg-white border-gray-300 text-gray-900 placeholder-gray-400'
-                } focus:outline-none focus:ring-2 focus:ring-indigo-500`}
-              />
-              <button
-                type="button"
-                onClick={() => setShowPassword(!showPassword)}
-                className={`absolute right-3 top-3 ${
-                  darkMode ? 'text-gray-500 hover:text-gray-400' : 'text-gray-400 hover:text-gray-600'
-                }`}
-              >
-                {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
-              </button>
-            </div>
-            {mode === 'signup' && (
-              <p className={`text-xs mt-2 ${
-                darkMode ? 'text-gray-400' : 'text-gray-600'
-              }`}>
-                Password must be at least 6 characters
-              </p>
-            )}
-          </div>
-
-          {/* Submit Button */}
-          <button
-            type="submit"
-            disabled={loading}
-            className={`w-full py-2 rounded-lg font-semibold flex items-center justify-center gap-2 transition-all ${
-              loading
-                ? 'opacity-50 cursor-not-allowed'
-                : 'hover:shadow-lg'
-            } ${
-              darkMode
-                ? 'bg-gradient-to-r from-indigo-600 to-purple-600 text-white hover:from-indigo-500 hover:to-purple-500'
-                : 'bg-gradient-to-r from-indigo-600 to-purple-600 text-white hover:from-indigo-700 hover:to-purple-700'
-            }`}
-          >
-            {loading && <Loader size={18} className="animate-spin" />}
-            {loading ? 'Processing...' : (mode === 'login' ? 'Sign In' : 'Create Account')}
+          {mode === 'login' && (
+            <button type="button" className="text-sm text-indigo-600" onClick={() => { setMode('reset'); setError(''); }}>Forgot password?</button>
+          )}
+          <button type="submit" disabled={loading} className="w-full py-2.5 rounded-lg font-semibold bg-indigo-600 text-white disabled:opacity-50">
+            {loading ? 'Please wait…' : mode === 'login' ? 'Sign in' : mode === 'signup' ? 'Create account' : 'Send reset email'}
           </button>
         </form>
-
-        {/* Toggle Mode */}
-        <div className={`mt-6 text-center text-sm ${
-          darkMode ? 'text-gray-400' : 'text-gray-600'
-        }`}>
-          {mode === 'login' ? "Don't have an account?" : 'Already have an account?'}
-          {' '}
-          <button
-            type="button"
-            onClick={() => {
-              setMode(mode === 'login' ? 'signup' : 'login');
-              setError('');
-            }}
-            className={`font-semibold ${
-              darkMode
-                ? 'text-indigo-400 hover:text-indigo-300'
-                : 'text-indigo-600 hover:text-indigo-700'
-            }`}
-          >
-            {mode === 'login' ? 'Sign up' : 'Sign in'}
-          </button>
-        </div>
-
-        {/* App Summary */}
-        <div className={`mt-6 p-4 rounded-lg border ${
-          darkMode
-            ? 'bg-blue-900/30 border-blue-700/60'
-            : 'bg-blue-50 border-blue-200'
-        }`}>
-          <p className={`text-sm font-semibold mb-2 ${
-            darkMode ? 'text-blue-200' : 'text-blue-700'
-          }`}>
-            Master your cybersecurity journey
-          </p>
-          <p className={`text-sm leading-relaxed ${
-            darkMode ? 'text-blue-100/90' : 'text-blue-700/80'
-          }`}>
-            CyberStudy helps you plan lessons, track study sessions, analyse progress, stay on top of goals, and keep your data in sync across devices with Firebase. Sign in to start building consistent habits.
-          </p>
-        </div>
+        <p className="mt-6 text-center text-sm text-gray-500">
+          {mode === 'reset' ? (
+            <button type="button" className="text-indigo-600 inline-flex items-center gap-1" onClick={() => setMode('login')}><ArrowLeft size={14} />Back to sign in</button>
+          ) : (
+            <> {mode === 'login' ? 'No account?' : 'Have an account?'}{' '}
+              <button type="button" className="text-indigo-600 font-semibold" onClick={() => { setMode(mode === 'login' ? 'signup' : 'login'); setError(''); }}>
+                {mode === 'login' ? 'Sign up' : 'Sign in'}
+              </button>
+            </>
+          )}
+        </p>
       </div>
     </div>
   );
