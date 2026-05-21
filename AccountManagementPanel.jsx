@@ -379,14 +379,25 @@ const AccountManagementPanel = ({ darkMode, onLogout }) => {
         </div>
       </div>
 
+      {/* Privacy */}
       <div className={`${darkMode ? 'bg-gray-800 border-gray-700' : 'bg-white border-gray-100'} rounded-2xl p-8 border space-y-4`}>
         <h2 className={`text-2xl font-bold flex items-center gap-2 ${darkMode ? 'text-white' : 'text-gray-900'}`}>
-          <Shield size={24} /> Privacy & data
+          <Shield size={24} />
+          Privacy & data
         </h2>
         <p className={`text-sm ${darkMode ? 'text-gray-400' : 'text-gray-600'}`}>
-          Your study data is stored in Firebase under your account. Export anytime from the Data tab.
+          Your study entries, goals, and sessions are stored in Firebase under your account. We do not sell your data.
+          Export your data anytime from the Data tab. Deleting your account removes your authentication profile;
+          contact support if you need full cloud data removal.
         </p>
-        <a href="/privacy.html" target="_blank" rel="noopener noreferrer" className="text-sm font-semibold text-indigo-600 underline">Privacy policy</a>
+        <a
+          href="/privacy.html"
+          target="_blank"
+          rel="noopener noreferrer"
+          className={`text-sm font-semibold underline ${darkMode ? 'text-indigo-400' : 'text-indigo-600'}`}
+        >
+          Read privacy policy
+        </a>
       </div>
 
       {/* Delete Account Section */}

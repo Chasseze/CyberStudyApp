@@ -9,7 +9,7 @@
     "preview": "vite preview",
     "firebase:login": "npx firebase login",
     "firebase:init": "npx firebase use --add",
-    "deploy:firebase": "npm run build && npx firebase deploy --only hosting,firestore:rules"
+    "deploy:firebase": "npm run build && npx firebase deploy --only hosting"
   },
   "dependencies": {
     "chart.js": "^4.5.1",

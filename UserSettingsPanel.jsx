@@ -23,7 +23,13 @@ import { getUserProfile, updateUserProfile } from './authService';
  * UserSettingsPanel Component
  * Handles user preferences and settings management
  */
-const UserSettingsPanel = ({ darkMode, onDarkModeChange, onThemeChange, soundEnabled = true, onSoundEnabledChange }) => {
+const UserSettingsPanel = ({
+  darkMode,
+  onDarkModeChange,
+  onThemeChange,
+  soundEnabled = true,
+  onSoundEnabledChange,
+}) => {
   const { user } = useAuth();
   const [settings, setSettings] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -235,12 +241,33 @@ const UserSettingsPanel = ({ darkMode, onDarkModeChange, onThemeChange, soundEna
             </button>
           </div>
 
-          <div className="flex items-center justify-between pb-4 border-b" style={{ borderColor: darkMode ? '#374151' : '#e5e7eb' }}>
+          {/* Pomodoro timer sound */}
+          <div
+            className="flex items-center justify-between pb-4 border-b"
+            style={{ borderColor: darkMode ? '#374151' : '#e5e7eb' }}
+          >
             <div>
-              <p className="font-semibold flex items-center gap-2">{soundEnabled ? <Volume2 size={18} /> : <VolumeX size={18} />} Pomodoro sounds</p>
-              <p className={`text-sm ${darkMode ? 'text-gray-400' : 'text-gray-600'}`}>Chime when sessions end</p>
+              <p className="font-semibold flex items-center gap-2">
+                {soundEnabled ? <Volume2 size={18} aria-hidden /> : <VolumeX size={18} aria-hidden />}
+                Pomodoro sounds
+              </p>
+              <p className={`text-sm ${darkMode ? 'text-gray-400' : 'text-gray-600'}`}>
+                Play a chime when a work or break session ends
+              </p>
             </div>
-            <button type="button" onClick={() => onSoundEnabledChange?.(!soundEnabled)} className={`px-4 py-2 rounded-lg font-semibold ${soundEnabled ? 'bg-green-600 text-white' : 'bg-gray-200'}`}>{soundEnabled ? 'On' : 'Off'}</button>
+            <button
+              type="button"
+              onClick={() => onSoundEnabledChange?.(!soundEnabled)}
+              className={`px-4 py-2 rounded-lg font-semibold transition-all focus-visible:ring-2 focus-visible:ring-indigo-500 ${
+                soundEnabled
+                  ? 'bg-green-600 hover:bg-green-500 text-white'
+                  : darkMode
+                    ? 'bg-gray-700 hover:bg-gray-600 text-white'
+                    : 'bg-gray-200 hover:bg-gray-300 text-gray-900'
+              }`}
+            >
+              {soundEnabled ? 'On' : 'Off'}
+            </button>
           </div>
 
           {/* Sound Notifications */}
@@ -254,8 +281,9 @@ const UserSettingsPanel = ({ darkMode, onDarkModeChange, onThemeChange, soundEna
               </p>
             </div>
             <button
+              type="button"
               onClick={() => handleSettingChange('notifications', 'sound', !formData.notifications.sound)}
-              className={`px-4 py-2 rounded-lg font-semibold transition-all ${
+              className={`px-4 py-2 rounded-lg font-semibold transition-all focus-visible:ring-2 focus-visible:ring-indigo-500 ${
                 formData.notifications.sound
                   ? 'bg-green-600 hover:bg-green-500 text-white'
                   : darkMode ? 'bg-gray-700 hover:bg-gray-600 text-white' : 'bg-gray-200 hover:bg-gray-300 text-gray-900'

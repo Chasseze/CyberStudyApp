@@ -46,7 +46,8 @@ const DataManagementPanel = ({ darkMode, entries = [], goals = [], timerSessions
 
         // Calculate statistics
         const totalStudyTime = dbSessions?.reduce((acc, session) => acc + (session.duration || 0), 0) || 0;
-        const completedEntries = dbEntries?.filter((e) => normalizeStatus(e.status) === ENTRY_STATUS.COMPLETED).length || 0;
+        const completedEntries =
+          dbEntries?.filter((e) => normalizeStatus(e.status) === ENTRY_STATUS.COMPLETED).length || 0;
         const completedGoals = dbGoals?.filter(g => g.status === 'completed').length || 0;
 
         setStats({

@@ -74,7 +74,10 @@ const CyberTrackerAppWithAuth = () => {
   const [formData, setFormData] = useState(EMPTY_FORM);
   const [editingId, setEditingId] = useState(null);
   const [isSaving, setIsSaving] = useState(false);
-  const [soundEnabled, setSoundEnabled] = useState(() => localStorage.getItem('pomodoroSound') !== 'false');
+  const [soundEnabled, setSoundEnabled] = useState(() => {
+    const s = localStorage.getItem('pomodoroSound');
+    return s !== 'false';
+  });
   const searchInputRef = useRef(null);
 
   useEffect(() => {
@@ -110,17 +113,21 @@ const CyberTrackerAppWithAuth = () => {
       setEntriesLoading(false);
       reportSyncEnd();
     });
-    const unsubGoals = subscribeToGoals(user.uid, (g) => {
-      setGoals(g);
-      localStorage.setItem('studyGoals', JSON.stringify(g));
+
+    const unsubGoals = subscribeToGoals(user.uid, (firestoreGoals) => {
+      setGoals(firestoreGoals);
+      localStorage.setItem('studyGoals', JSON.stringify(firestoreGoals));
     });
-    const unsubSessions = subscribeToTimerSessions(user.uid, (s) => {
-      setTimerSessions(s);
-      localStorage.setItem('timerSessions', JSON.stringify(s));
+
+    const unsubSessions = subscribeToTimerSessions(user.uid, (firestoreSessions) => {
+      setTimerSessions(firestoreSessions);
+      localStorage.setItem('timerSessions', JSON.stringify(firestoreSessions));
     });
+
     const unsubStreak = subscribeToStreak(user.uid, setStreak);
 
-    if (!localStorage.getItem(`migrated_${user.uid}`)) {
+    const hasMigrated = localStorage.getItem(`migrated_${user.uid}`);
+    if (!hasMigrated) {
       const localEntries = JSON.parse(localStorage.getItem('entries') || '[]');
       const localGoals = JSON.parse(localStorage.getItem('studyGoals') || '[]');
       const localSessions = JSON.parse(localStorage.getItem('timerSessions') || '[]');
@@ -138,7 +145,7 @@ const CyberTrackerAppWithAuth = () => {
           })
           .catch((err) => {
             reportSyncError(err.message);
-            toast.error('Migration failed');
+            toast.error('Migration failed — data kept locally');
           });
       }
     }
@@ -173,6 +180,7 @@ const CyberTrackerAppWithAuth = () => {
       toast.error(sanitized.error);
       return;
     }
+
     setIsSaving(true);
     reportSyncStart();
     const payload = sanitized.data;
@@ -180,27 +188,35 @@ const CyberTrackerAppWithAuth = () => {
 
     try {
       if (editingId) {
-        persistEntryLocal(
-          entries.map((entry) =>
-            String(entry.id) === String(editingId)
-              ? { ...entry, ...payload, updatedAt: new Date().toISOString() }
-              : entry
-          )
+        const optimistic = entries.map((entry) =>
+          String(entry.id) === String(editingId)
+            ? { ...entry, ...payload, status: payload.status, updatedAt: new Date().toISOString() }
+            : entry
         );
-        if (user?.uid) await updateEntry(user.uid, String(editingId), payload);
+        persistEntryLocal(optimistic);
+
+        if (user?.uid) {
+          await updateEntry(user.uid, String(editingId), payload);
+        }
         toast.success('Entry updated');
         resetForm();
       } else {
         if (user?.uid) {
           await addEntry(user.uid, payload);
         } else {
-          persistEntryLocal([{ id: Date.now(), ...payload, createdAt: new Date().toISOString() }, ...entries]);
+          const optimisticEntry = {
+            id: Date.now(),
+            ...payload,
+            createdAt: new Date().toISOString(),
+          };
+          persistEntryLocal([optimisticEntry, ...entries]);
         }
         toast.success('Entry saved');
         resetForm();
       }
       reportSyncEnd();
     } catch (error) {
+      console.error('Save entry error:', error);
       persistEntryLocal(previousEntries);
       reportSyncError(error.message);
       toast.error('Failed to save. Changes reverted.');
@@ -224,8 +240,10 @@ const CyberTrackerAppWithAuth = () => {
   const handleDelete = async (id) => {
     if (!window.confirm('Delete this entry?')) return;
     const previous = entries;
-    persistEntryLocal(entries.filter((e) => String(e.id) !== String(id)));
+    const next = entries.filter((e) => String(e.id) !== String(id));
+    persistEntryLocal(next);
     reportSyncStart();
+
     try {
       if (user?.uid) await deleteEntry(user.uid, String(id));
       toast.success('Entry deleted');
@@ -247,15 +265,16 @@ const CyberTrackerAppWithAuth = () => {
     };
     reportSyncStart();
     try {
-      if (user?.uid) await addTimerSession(user.uid, newSession);
-      else {
+      if (user?.uid) {
+        await addTimerSession(user.uid, newSession);
+      } else {
         const updated = [...timerSessions, newSession];
         setTimerSessions(updated);
         localStorage.setItem('timerSessions', JSON.stringify(updated));
       }
       toast.success(sessionData.type === 'work' ? 'Work session complete!' : 'Break complete!');
       reportSyncEnd();
-    } catch {
+    } catch (error) {
       const updated = [...timerSessions, newSession];
       setTimerSessions(updated);
       localStorage.setItem('timerSessions', JSON.stringify(updated));
@@ -295,7 +314,9 @@ const CyberTrackerAppWithAuth = () => {
 
   const statusCounts = countByStatus(entries);
   const totalEntries = entries.length;
-  const completionRate = totalEntries ? Math.round((statusCounts.completed / totalEntries) * 100) : 0;
+  const completionRate = totalEntries
+    ? Math.round((statusCounts.completed / totalEntries) * 100)
+    : 0;
   const totalFocusMinutes = timerSessions.reduce((sum, s) => sum + (s.duration || 0), 0);
   const latestEntry = entries.reduce((latest, entry) => {
     const entryDate = parseFirestoreDate(entry.createdAt);
@@ -309,7 +330,7 @@ const CyberTrackerAppWithAuth = () => {
     { id: 'home', label: 'Home', shortLabel: 'Home', icon: Home },
     { id: 'tracker', label: 'Tracker', shortLabel: 'Track', icon: BookOpen },
     { id: 'pomodoro', label: 'Pomodoro', shortLabel: 'Timer', icon: Timer },
-    { id: 'insights', label: 'Insights', shortLabel: 'Stats', icon: BarChart3 },
+    { id: 'insights', label: 'Insights', shortLabel: 'Stats', icon: BarChart3, mobile: true },
     { id: 'goals', label: 'Goals', shortLabel: 'Goals', icon: Target },
     { id: 'profile', label: 'Profile', shortLabel: 'You', icon: User },
   ];
@@ -328,7 +349,7 @@ const CyberTrackerAppWithAuth = () => {
   if (authLoading) {
     return (
       <div className={`${shellBg} flex items-center justify-center`}>
-        <div className="text-center" role="status">
+        <div className="text-center" role="status" aria-live="polite">
           <div className="animate-spin rounded-full h-16 w-16 border-t-2 border-b-2 border-indigo-500 mx-auto mb-4" />
           <p className={darkMode ? 'text-gray-400' : 'text-gray-600'}>Loading your study tracker…</p>
         </div>
@@ -410,10 +431,22 @@ const CyberTrackerAppWithAuth = () => {
               <Card darkMode={darkMode} hover={false} className="!p-5">
                 <h3 className="font-semibold mb-4">Overview</h3>
                 <div className="grid grid-cols-2 md:grid-cols-4 gap-3 text-center">
-                  <div><p className="text-2xl font-bold">{totalEntries}</p><p className="text-xs text-gray-500">Entries</p></div>
-                  <div><p className="text-2xl font-bold text-emerald-500">{completionRate}%</p><p className="text-xs text-gray-500">Done</p></div>
-                  <div><p className="text-2xl font-bold">{statusCounts.inProgress + statusCounts.review}</p><p className="text-xs text-gray-500">Active</p></div>
-                  <div><p className="text-2xl font-bold">{totalFocusMinutes}</p><p className="text-xs text-gray-500">Focus min</p></div>
+                  <div>
+                    <p className="text-2xl font-bold">{totalEntries}</p>
+                    <p className={`text-xs ${darkMode ? 'text-gray-400' : 'text-gray-500'}`}>Entries</p>
+                  </div>
+                  <div>
+                    <p className="text-2xl font-bold text-emerald-500">{completionRate}%</p>
+                    <p className={`text-xs ${darkMode ? 'text-gray-400' : 'text-gray-500'}`}>Done</p>
+                  </div>
+                  <div>
+                    <p className="text-2xl font-bold">{statusCounts.inProgress + statusCounts.review}</p>
+                    <p className={`text-xs ${darkMode ? 'text-gray-400' : 'text-gray-500'}`}>Active</p>
+                  </div>
+                  <div>
+                    <p className="text-2xl font-bold">{totalFocusMinutes}</p>
+                    <p className={`text-xs ${darkMode ? 'text-gray-400' : 'text-gray-500'}`}>Focus min</p>
+                  </div>
                 </div>
               </Card>
               <EntryList
@@ -430,7 +463,11 @@ const CyberTrackerAppWithAuth = () => {
           )}
 
           {activeTab === 'pomodoro' && (
-            <PomodoroTimer darkMode={darkMode} onSessionComplete={handleSessionComplete} soundEnabled={soundEnabled} />
+            <PomodoroTimer
+              darkMode={darkMode}
+              onSessionComplete={handleSessionComplete}
+              soundEnabled={soundEnabled}
+            />
           )}
 
           {activeTab === 'insights' && (
@@ -446,7 +483,12 @@ const CyberTrackerAppWithAuth = () => {
           {activeTab === 'goals' && (
             <ErrorBoundary darkMode={darkMode} componentName="Goals">
               <Suspense fallback={<TabContentSkeleton darkMode={darkMode} />}>
-                <GoalsPanel entries={entries} darkMode={darkMode} goals={goals} onGoalsUpdate={setGoals} />
+                <GoalsPanel
+                  entries={entries}
+                  darkMode={darkMode}
+                  goals={goals}
+                  onGoalsUpdate={setGoals}
+                />
               </Suspense>
             </ErrorBoundary>
           )}
@@ -454,14 +496,20 @@ const CyberTrackerAppWithAuth = () => {
           {activeTab === 'profile' && (
             <div className="space-y-6">
               <Card darkMode={darkMode} hover={false} className="!p-2">
-                <div className="flex flex-wrap gap-2">
+                <div className="flex flex-wrap gap-2" role="tablist">
                   {profileSections.map((section) => (
                     <button
                       key={section.id}
                       type="button"
+                      role="tab"
+                      aria-selected={profileSection === section.id}
                       onClick={() => setProfileSection(section.id)}
-                      className={`flex-1 min-w-[5rem] py-2 px-3 text-sm font-semibold rounded-lg ${
-                        profileSection === section.id ? 'bg-indigo-600 text-white' : ''
+                      className={`flex-1 min-w-[5rem] py-2 px-3 text-sm font-semibold rounded-lg focus-visible:ring-2 focus-visible:ring-indigo-500 ${
+                        profileSection === section.id
+                          ? 'bg-indigo-600 text-white'
+                          : darkMode
+                            ? 'text-gray-300 hover:bg-gray-700'
+                            : 'text-gray-600 hover:bg-gray-100'
                       }`}
                     >
                       {section.label}
@@ -469,24 +517,42 @@ const CyberTrackerAppWithAuth = () => {
                   ))}
                 </div>
               </Card>
+
               {profileSection === 'profile' && (
                 <ErrorBoundary darkMode={darkMode} componentName="Profile">
                   <Suspense fallback={<TabContentSkeleton darkMode={darkMode} />}>
-                    <UserProfilePanel darkMode={darkMode} onDarkModeChange={setDarkMode} entries={entries} goals={goals} timerSessions={timerSessions} onLogout={logoutUser} />
+                    <UserProfilePanel
+                      darkMode={darkMode}
+                      onDarkModeChange={setDarkMode}
+                      entries={entries}
+                      goals={goals}
+                      timerSessions={timerSessions}
+                      onLogout={logoutUser}
+                    />
                   </Suspense>
                 </ErrorBoundary>
               )}
               {profileSection === 'settings' && (
                 <ErrorBoundary darkMode={darkMode} componentName="Settings">
                   <Suspense fallback={<TabContentSkeleton darkMode={darkMode} />}>
-                    <UserSettingsPanel darkMode={darkMode} onDarkModeChange={setDarkMode} soundEnabled={soundEnabled} onSoundEnabledChange={setSoundEnabled} />
+                    <UserSettingsPanel
+                      darkMode={darkMode}
+                      onDarkModeChange={setDarkMode}
+                      soundEnabled={soundEnabled}
+                      onSoundEnabledChange={setSoundEnabled}
+                    />
                   </Suspense>
                 </ErrorBoundary>
               )}
               {profileSection === 'data' && (
                 <ErrorBoundary darkMode={darkMode} componentName="Data">
                   <Suspense fallback={<TabContentSkeleton darkMode={darkMode} />}>
-                    <DataManagementPanel darkMode={darkMode} entries={entries} goals={goals} timerSessions={timerSessions} />
+                    <DataManagementPanel
+                      darkMode={darkMode}
+                      entries={entries}
+                      goals={goals}
+                      timerSessions={timerSessions}
+                    />
                   </Suspense>
                 </ErrorBoundary>
               )}
@@ -500,6 +566,10 @@ const CyberTrackerAppWithAuth = () => {
             </div>
           )}
         </main>
+
+        <p className={`hidden sm:block text-center text-xs mt-8 ${darkMode ? 'text-gray-600' : 'text-gray-400'}`}>
+          Shortcuts: 1–6 switch tabs · / focus search
+        </p>
       </div>
     </div>
   );

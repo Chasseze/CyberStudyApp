@@ -54,9 +54,10 @@ export const registerUser = async (email, password, displayName) => {
     try {
       await sendEmailVerification(user);
     } catch (e) {
-      console.warn('Verification email:', e);
+      console.warn('Could not send verification email:', e);
     }
 
+    // Initialize streak document
     await setDoc(doc(db, 'streaks', user.uid, 'data', 'current'), {
       userId: user.uid,
       currentStreak: 0,
@@ -179,10 +180,21 @@ export const updateUserPreferences = async (uid, preferences) => {
   }
 };
 
+/**
+ * Send password reset email
+ */
 export const resetPassword = async (email) => {
-  await sendPasswordResetEmail(auth, email);
+  try {
+    await sendPasswordResetEmail(auth, email);
+  } catch (error) {
+    console.error('Password reset error:', error);
+    throw error;
+  }
 };
 
+/**
+ * Resend email verification to current user
+ */
 export const resendVerificationEmail = async () => {
   const user = auth.currentUser;
   if (!user) throw new Error('No user signed in');

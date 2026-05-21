@@ -112,7 +112,7 @@ const AnalyticsPanel = ({ entries, darkMode, timerSessions }) => {
 
   if (analytics.totalEntries === 0) {
     return (
-      <div className={`max-w-6xl mx-auto ${darkMode ? 'bg-gray-800' : 'bg-white'} rounded-2xl shadow-xl p-8 text-center`}>
+      <div className={`max-w-4xl mx-auto ${darkMode ? 'bg-gray-800' : 'bg-white'} rounded-2xl shadow-xl p-8 text-center`}>
         <AlertCircle className={`mx-auto mb-4 ${darkMode ? 'text-gray-400' : 'text-gray-500'}`} size={48} />
         <p className={`text-lg ${darkMode ? 'text-gray-300' : 'text-gray-600'}`}>
           No study entries yet. Start tracking your progress to see analytics!
@@ -124,7 +124,7 @@ const AnalyticsPanel = ({ entries, darkMode, timerSessions }) => {
   const COLORS = ['#10b981', '#f59e0b', '#ef4444', '#8b5cf6'];
 
   return (
-    <div className="space-y-6 max-w-4xl mx-auto w-full">
+    <div className={`space-y-6 max-w-4xl mx-auto w-full`}>
       {/* KPI Cards */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
         {/* Completion Rate */}

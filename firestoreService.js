@@ -94,7 +94,9 @@ export const updateEntry = async (userId, entryId, updates) => {
   try {
     const entryRef = doc(db, 'entries', userId, 'data', entryId);
     const payload = { ...updates, updatedAt: serverTimestamp() };
-    if (updates.status !== undefined) payload.status = normalizeStatus(updates.status);
+    if (updates.status !== undefined) {
+      payload.status = normalizeStatus(updates.status);
+    }
     await updateDoc(entryRef, payload);
   } catch (error) {
     console.error('Error updating entry:', error);
@@ -327,7 +329,11 @@ export const subscribeToStreak = (userId, callback) => {
     const streakRef = doc(db, 'streaks', userId, 'data', 'current');
     
     return onSnapshot(streakRef, (snap) => {
-      callback(snap.exists() ? snap.data() : { currentStreak: 0, maxStreak: 0 });
+      if (snap.exists()) {
+        callback(snap.data());
+      } else {
+        callback({ currentStreak: 0, maxStreak: 0 });
+      }
     });
   } catch (error) {
     console.error('Error subscribing to streak:', error);
@@ -372,6 +378,7 @@ export const migrateLocalStorageToFirestore = async (userId, localData) => {
         const entryRef = doc(db, 'entries', userId, 'data', entry.id.toString());
         batch.set(entryRef, {
           ...entry,
+          status: normalizeStatus(entry.status),
           userId,
           createdAt: serverTimestamp(),
           updatedAt: serverTimestamp(),

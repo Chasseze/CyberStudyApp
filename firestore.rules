@@ -22,20 +22,24 @@ service cloud.firestore {
       allow read, write: if isOwner(userId);
     }
 
+    // Entries: /entries/{userId}/data/{entryId}
     match /entries/{userId}/data/{entryId} {
       allow read: if isOwner(userId);
       allow create, update: if isOwner(userId) && validEntry();
       allow delete: if isOwner(userId);
     }
-
+    
+    // Goals: /goals/{userId}/data/{goalId}
     match /goals/{userId}/data/{goalId} {
       allow read, write: if isOwner(userId);
     }
-
+    
+    // Timer Sessions: /timerSessions/{userId}/data/{sessionId}
     match /timerSessions/{userId}/data/{sessionId} {
       allow read, write: if isOwner(userId);
     }
-
+    
+    // Streaks: /streaks/{userId}/data/{document}
     match /streaks/{userId}/data/{document} {
       allow read, write: if isOwner(userId);
     }
